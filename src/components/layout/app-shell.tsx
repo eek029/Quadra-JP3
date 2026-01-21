@@ -170,7 +170,7 @@ export function AppShell({ children }: AppShellProps) {
             <footer className="bg-gradient-purple text-white py-6">
                 <div className="container mx-auto px-4 text-center">
                     <p className="text-sm">
-                        © {new Date().getFullYear()} Reserva Quadra - Complexo Júlio Prestes. Todos os direitos reservados.
+                        © {new Date().getFullYear()} eek029 Sistemas e Automação
                     </p>
                 </div>
             </footer>
