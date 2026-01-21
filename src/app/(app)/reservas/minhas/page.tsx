@@ -2,147 +2,222 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, MapPin, X, Edit } from 'lucide-react';
-import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { getUser } from '@/app/actions/auth';
+import { getUserReservations, cancelReservation } from '@/app/actions/reservation';
+import { ReservationCard } from '@/components/reservations/ReservationCard';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
-type Tab = 'upcoming' | 'past' | 'cancelled';
+export default function MinhasReservasPage() {
+    const router = useRouter();
+    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState<any>(null);
+    const [reservations, setReservations] = useState<any[]>([]);
+    const [error, setError] = useState('');
 
-export default function MyReservationsPage() {
-    const [activeTab, setActiveTab] = useState<Tab>('upcoming');
+    const [cancellingId, setCancellingId] = useState<string | null>(null);
+    const [cancelReason, setCancelReason] = useState('');
+    const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-    // Mock data
-    const reservations = {
-        upcoming: [
-            { id: 1, date: '2026-01-22', time: '18:00 - 19:00', court: 'Quadra' },
-            { id: 2, date: '2026-01-24', time: '20:00 - 21:00', court: 'Quadra' },
-            { id: 3, date: '2026-01-26', time: '19:00 - 20:00', court: 'Quadra' },
-        ],
-        past: [
-            { id: 4, date: '2026-01-15', time: '18:00 - 19:00', court: 'Quadra' },
-            { id: 5, date: '2026-01-10', time: '20:00 - 21:00', court: 'Quadra' },
-        ],
-        cancelled: [
-            { id: 6, date: '2026-01-20', time: '19:00 - 20:00', court: 'Quadra' },
-        ],
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const loadData = async () => {
+        try {
+            const currentUser = await getUser();
+            if (!currentUser) {
+                router.push('/login');
+                return;
+            }
+
+            setUser(currentUser);
+
+            const userReservations = await getUserReservations(currentUser.id);
+            setReservations(userReservations);
+        } catch (err) {
+            setError('Erro ao carregar reservas');
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const currentReservations = reservations[activeTab];
+    const handleCancelClick = (id: string) => {
+        setCancellingId(id);
+        setShowCancelDialog(true);
+    };
+
+    const handleConfirmCancel = async () => {
+        if (!cancellingId) return;
+
+        try {
+            const result = await cancelReservation(user.id, cancellingId, cancelReason);
+
+            if (!result.success) {
+                setError(result.error || 'Erro ao cancelar reserva');
+            } else {
+                await loadData();
+                setShowCancelDialog(false);
+                setCancellingId(null);
+                setCancelReason('');
+            }
+        } catch (err) {
+            setError('Erro inesperado ao cancelar reserva');
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-white">Carregando...</div>
+            </div>
+        );
+    }
+
+    const futureReservations = reservations.filter(
+        (r) => new Date(r.starts_at) > new Date() && r.status === 'confirmed'
+    );
+
+    const pastReservations = reservations.filter(
+        (r) => new Date(r.starts_at) <= new Date() || r.status !== 'confirmed'
+    );
 
     return (
-        <div className="space-y-8 animate-fade-in">
-            <div>
-                <h1 className="text-3xl font-bold text-gradient-purple">
-                    Minhas Reservas
-                </h1>
-                <p className="text-muted-foreground mt-2">
-                    Gerencie todas as suas reservas
-                </p>
-            </div>
+        <div className="container max-w-4xl mx-auto p-6">
+            <h1 className="text-3xl font-bold text-white mb-6">Minhas Reservas</h1>
 
-            {/* Tabs */}
-            <div className="flex flex-wrap gap-2 border-b">
-                <Button
-                    variant={activeTab === 'upcoming' ? 'default' : 'ghost'}
-                    onClick={() => setActiveTab('upcoming')}
-                    className={
-                        activeTab === 'upcoming' ? 'bg-gradient-purple' : ''
-                    }
-                >
-                    Próximas ({reservations.upcoming.length})
-                </Button>
-                <Button
-                    variant={activeTab === 'past' ? 'default' : 'ghost'}
-                    onClick={() => setActiveTab('past')}
-                    className={activeTab === 'past' ? 'bg-gradient-purple' : ''}
-                >
-                    Passadas ({reservations.past.length})
-                </Button>
-                <Button
-                    variant={activeTab === 'cancelled' ? 'default' : 'ghost'}
-                    onClick={() => setActiveTab('cancelled')}
-                    className={
-                        activeTab === 'cancelled' ? 'bg-gradient-purple' : ''
-                    }
-                >
-                    Canceladas ({reservations.cancelled.length})
-                </Button>
-            </div>
+            {error && (
+                <Alert className="mb-6 bg-red-500/20 border-red-500/50 text-red-100">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                </Alert>
+            )}
 
-            {/* Reservations List */}
-            <div className="grid gap-4">
-                {currentReservations.length > 0 ? (
-                    currentReservations.map((reservation) => (
-                        <Card key={reservation.id} className="hover:shadow-lg transition-shadow">
-                            <CardHeader className="pb-3">
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <CardTitle className="text-xl flex items-center gap-2">
-                                            <MapPin className="h-5 w-5 text-purple-600" />
-                                            {reservation.court}
-                                        </CardTitle>
-                                        <CardDescription className="mt-1">
-                                            Reserva #{reservation.id.toString().padStart(4, '0')}
-                                        </CardDescription>
-                                    </div>
-                                    <div className="h-12 w-12 rounded-lg bg-gradient-purple flex items-center justify-center text-white font-bold text-lg">
-                                        {new Date(reservation.date).getDate()}
-                                    </div>
+            <Tabs defaultValue="futuras" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-2 bg-white/10">
+                    <TabsTrigger value="futuras" className="data-[state=active]:bg-purple-600">
+                        Futuras ({futureReservations.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="passadas" className="data-[state=active]:bg-purple-600">
+                        Histórico ({pastReservations.length})
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="futuras">
+                    <Card className="glass-dark border-white/20">
+                        <CardHeader>
+                            <CardTitle className="text-xl text-white">Próximas Reservas</CardTitle>
+                            <CardDescription className="text-purple-200">
+                                Suas reservas confirmadas
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {futureReservations.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <AlertCircle className="h-12 w-12 text-purple-300 mx-auto mb-3" />
+                                    <p className="text-purple-200">Você não tem reservas futuras</p>
+                                    <Button
+                                        onClick={() => router.push('/reservas/nova')}
+                                        className="mt-4 bg-gradient-purple hover:bg-gradient-purple-hover"
+                                    >
+                                        Fazer uma reserva
+                                    </Button>
                                 </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                                            <span>
-                                                {new Date(reservation.date).toLocaleDateString('pt-BR', {
-                                                    weekday: 'long',
-                                                    day: 'numeric',
-                                                    month: 'long',
-                                                    year: 'numeric',
-                                                })}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <Clock className="h-4 w-4 text-muted-foreground" />
-                                            <span>{reservation.time}</span>
-                                        </div>
-                                    </div>
-
-                                    {activeTab === 'upcoming' && (
-                                        <div className="flex gap-2">
-                                            <Button variant="outline" size="sm" className="gap-2">
-                                                <Edit className="h-4 w-4" />
-                                                Editar
-                                            </Button>
-                                            <Button
-                                                variant="destructive"
-                                                size="sm"
-                                                className="gap-2"
-                                            >
-                                                <X className="h-4 w-4" />
-                                                Cancelar
-                                            </Button>
-                                        </div>
-                                    )}
+                            ) : (
+                                <div className="space-y-3">
+                                    {futureReservations.map((reservation) => (
+                                        <ReservationCard
+                                            key={reservation.id}
+                                            reservation={reservation}
+                                            onCancel={handleCancelClick}
+                                            showCancelButton
+                                        />
+                                    ))}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    ))
-                ) : (
-                    <Card>
-                        <CardContent className="text-center py-12">
-                            <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-20" />
-                            <p className="text-muted-foreground mb-4">
-                                Nenhuma reserva {activeTab === 'upcoming' ? 'agendada' : activeTab === 'past' ? 'passada' : 'cancelada'}
-                            </p>
-                            {activeTab === 'upcoming' && (
-                                <Button className="bg-gradient-purple">Nova Reserva</Button>
                             )}
                         </CardContent>
                     </Card>
-                )}
-            </div>
+                </TabsContent>
+
+                <TabsContent value="passadas">
+                    <Card className="glass-dark border-white/20">
+                        <CardHeader>
+                            <CardTitle className="text-xl text-white">Histórico</CardTitle>
+                            <CardDescription className="text-purple-200">
+                                Reservas passadas e canceladas
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {pastReservations.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <p className="text-purple-200">Nenhuma reserva no histórico</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {pastReservations.map((reservation) => (
+                                        <ReservationCard
+                                            key={reservation.id}
+                                            reservation={reservation}
+                                            showCancelButton={false}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+
+            {/* Cancel Dialog */}
+            <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+                <DialogContent className="glass-dark border-white/20">
+                    <DialogHeader>
+                        <DialogTitle className="text-white">Cancelar Reserva</DialogTitle>
+                        <DialogDescription className="text-purple-200">
+                            Tem certeza que deseja cancelar esta reserva?
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label htmlFor="reason" className="text-sm font-medium text-white">
+                                Motivo (opcional)
+                            </label>
+                            <textarea
+                                id="reason"
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                placeholder="Por que você está cancelando?"
+                                className="w-full p-3 bg-white/10 border border-white/20 rounded-md text-white placeholder:text-purple-200 min-h-[100px]"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowCancelDialog(false);
+                                setCancellingId(null);
+                                setCancelReason('');
+                            }}
+                            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                        >
+                            Voltar
+                        </Button>
+                        <Button
+                            onClick={handleConfirmCancel}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            Confirmar Cancelamento
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

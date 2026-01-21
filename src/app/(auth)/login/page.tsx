@@ -7,25 +7,43 @@ import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { Mail, Lock, Chrome, Apple } from 'lucide-react';
 import { useState } from 'react';
+import { signIn } from '@/app/actions/auth';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        // TODO: Implement Supabase authentication
-        console.log('Login:', { email, password });
+        setError('');
+        setLoading(true);
+
+        try {
+            const result = await signIn(email, password);
+            if (!result.success) {
+                setError(result.error || 'Erro ao fazer login');
+                setLoading(false);
+            }
+            // If successful, will redirect based on profile status
+        } catch (err) {
+            setError('Erro inesperado ao fazer login');
+            setLoading(false);
+        }
+    };
+
+    const handleTestUser = () => {
+        setEmail('user@teste.local');
+        setPassword('@123');
     };
 
     const handleGoogleLogin = () => {
-        // TODO: Implement Google OAuth
-        console.log('Google login');
+        alert('Google OAuth em breve!');
     };
 
     const handleAppleLogin = () => {
-        // TODO: Implement Apple OAuth
-        console.log('Apple login');
+        alert('Apple OAuth em breve!');
     };
 
     return (
@@ -39,6 +57,12 @@ export default function LoginPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                {error && (
+                    <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-sm text-red-100">
+                        {error}
+                    </div>
+                )}
+
                 {/* Email/Password Form */}
                 <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
@@ -55,6 +79,7 @@ export default function LoginPage() {
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-purple-200"
                                 required
+                                disabled={loading}
                             />
                         </div>
                     </div>
@@ -76,13 +101,14 @@ export default function LoginPage() {
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-purple-200"
                                 required
+                                disabled={loading}
                             />
                         </div>
                     </div>
 
                     <div className="flex justify-end">
                         <Link
-                            href="/esqueci-senha"
+                            href="/forgot-password"
                             className="text-sm text-purple-100 hover:text-white transition-colors"
                         >
                             Esqueceu a senha?
@@ -92,9 +118,22 @@ export default function LoginPage() {
                     <Button
                         type="submit"
                         className="w-full bg-gradient-purple hover:bg-gradient-purple-hover text-white font-semibold h-11 shadow-purple"
+                        disabled={loading}
                     >
-                        Entrar
+                        {loading ? 'Entrando...' : 'Entrar'}
                     </Button>
+
+                    {process.env.NODE_ENV === 'development' && (
+                        <Button
+                            type="button"
+                            onClick={handleTestUser}
+                            variant="outline"
+                            className="w-full bg-white/5 border-white/20 text-purple-200 hover:bg-white/10"
+                            disabled={loading}
+                        >
+                            🧪 Usuário de Teste
+                        </Button>
+                    )}
                 </form>
 
                 {/* Separator */}
