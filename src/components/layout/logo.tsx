@@ -13,7 +13,7 @@ export function Logo({ size = 120, className = '' }: LogoProps) {
                 alt="Complexo Logo"
                 width={size}
                 height={size}
-                className="rounded-lg object-contain"
+                className="rounded-lg object-contain aspect-square"
                 priority
             />
         </div>
